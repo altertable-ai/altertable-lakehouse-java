@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>ai.altertable</groupId>
+  <artifactId>altertable-lakehouse-java</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <name>Altertable Lakehouse Java SDK</name>
+  <description>Typed Java client for the Altertable Lakehouse API.</description>
+  <url>https://github.com/altertable-ai/altertable-lakehouse-java</url>
+  <licenses><license><name>MIT</name><url>https://opensource.org/licenses/MIT</url></license></licenses>
+  <properties>
+    <maven.compiler.release>17</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <junit.version>5.11.4</junit.version>
+    <jackson.version>2.18.2</jackson.version>
+    <testcontainers.version>1.20.4</testcontainers.version>
+  </properties>
+  <dependencies>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId><artifactId>jackson-databind</artifactId><version>${jackson.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><version>${junit.version}</version><scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId><artifactId>junit-jupiter</artifactId><version>${testcontainers.version}</version><scope>test</scope>
+    </dependency>
+  </dependencies>
+  <build>
+    <plugins>
+      <plugin>
+        <artifactId>maven-compiler-plugin</artifactId><version>3.13.0</version>
+        <configuration><release>${maven.compiler.release}</release><compilerArgs><arg>-Xlint:all,-serial</arg></compilerArgs></configuration>
+      </plugin>
+      <plugin>
+        <artifactId>maven-surefire-plugin</artifactId><version>3.5.2</version>
+      </plugin>
+    </plugins>
+  </build>
+</project>
