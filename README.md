@@ -1,5 +1,9 @@
 # Altertable Lakehouse Java SDK
 
+[![CI](https://github.com/altertable-ai/altertable-lakehouse-java/actions/workflows/ci.yml/badge.svg)](https://github.com/altertable-ai/altertable-lakehouse-java/actions/workflows/ci.yml)
+[![Maven Central](https://img.shields.io/maven-central/v/ai.altertable/altertable-lakehouse-java.svg)](https://central.sonatype.com/artifact/ai.altertable/altertable-lakehouse-java)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A typed Java 17 client for querying and ingesting data through the Altertable Lakehouse API.
 
 ## Install
@@ -87,6 +91,7 @@ All SDK failures extend `LakehouseException` and expose operation, method, path,
 | `requestTimeout` | `Duration` | 60 seconds | Per-request response timeout. |
 | `retries` | `int` | 2 | Retries after network errors or 5xx responses. |
 | `userAgentSuffix` | `String` | none | Appended to the SDK User-Agent. |
+| `httpClient` | `HttpClient` | pooled Java client | Overrides the SDK-managed HTTP client. |
 
 When direct credentials are not configured, the client reads `ALTERTABLE_LAKEHOUSE_USERNAME` and `ALTERTABLE_LAKEHOUSE_PASSWORD`, or `ALTERTABLE_BASIC_AUTH_TOKEN`. It fails at construction with `ConfigurationError` when none are available.
 
@@ -101,6 +106,8 @@ mvn verify
 ```
 
 The integration suite runs against `ghcr.io/altertable-ai/altertable-mock:latest`. Locally, Testcontainers starts the mock automatically; CI provides it as a service on port `15000`. No production credentials are required.
+
+Release Please creates version and changelog PRs from Conventional Commit titles. After a release PR merges, GitHub Actions publishes the signed JAR, sources JAR, and Javadoc JAR to Maven Central using the repository's protected release secrets.
 
 ## License
 
