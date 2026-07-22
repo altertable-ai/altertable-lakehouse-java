@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test (Java 17)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Verify Maven project
+        run: |
+          if [ ! -f pom.xml ]; then
+            echo "No Maven project is present yet; the SDK bootstrap will add one."
+            exit 0
+          fi
+          mvn --batch-mode --no-transfer-progress verify
