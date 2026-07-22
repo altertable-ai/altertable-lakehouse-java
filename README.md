@@ -12,7 +12,7 @@ A typed Java 17 client for querying and ingesting data through the Altertable La
 <dependency>
   <groupId>ai.altertable</groupId>
   <artifactId>altertable-lakehouse-java</artifactId>
-  <version>0.1.2</version>
+  <version>0.1.1</version> <!-- x-release-please-version -->
 </dependency>
 ```
 
