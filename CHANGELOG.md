@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.1.2](https://github.com/altertable-ai/altertable-lakehouse-java/compare/altertable-lakehouse-java-v0.1.1...altertable-lakehouse-java-v0.1.2) (2026-07-22)
+
+
+### Bug Fixes
+
+* **readme:** update Maven installation version ([#14](https://github.com/altertable-ai/altertable-lakehouse-java/issues/14)) ([2d956bc](https://github.com/altertable-ai/altertable-lakehouse-java/commit/2d956bc41c2434ac0c69bd598e540f53cfebac60))
+
 ## [0.1.1](https://github.com/altertable-ai/altertable-lakehouse-java/compare/altertable-lakehouse-java-v0.1.0...altertable-lakehouse-java-v0.1.1) (2026-07-22)
 
 
