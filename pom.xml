@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>ai.altertable</groupId>
   <artifactId>altertable-lakehouse-java</artifactId>
-  <version>0.1.2-SNAPSHOT</version>
+  <version>0.1.2</version>
   <name>Altertable Lakehouse Java SDK</name>
   <description>Typed Java client for the Altertable Lakehouse API.</description>
   <url>https://github.com/altertable-ai/altertable-lakehouse-java</url>
