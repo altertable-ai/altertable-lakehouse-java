@@ -29,9 +29,9 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-          server-id: ossrh
-          server-username: OSSRH_USERNAME
-          server-password: OSSRH_PASSWORD
+          server-id: central
+          server-username: MAVEN_CENTRAL_USERNAME
+          server-password: MAVEN_CENTRAL_PASSWORD
           gpg-private-key: ${{ secrets.SIGNING_KEY }}
           gpg-passphrase: SIGNING_PASSWORD
 
@@ -39,6 +39,6 @@ jobs:
         if: ${{ steps.release.outputs.release_created }}
         run: mvn --batch-mode --no-transfer-progress -DskipTests -Prelease deploy
         env:
-          OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
-          OSSRH_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
           SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
