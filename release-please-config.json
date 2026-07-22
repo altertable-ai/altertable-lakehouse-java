@@ -1,8 +1,9 @@
 {
   "packages": {
     ".": {
-      "release-type": "java",
+      "release-type": "maven",
       "package-name": "altertable-lakehouse-java",
+      "initial-version": "0.1.0",
       "bump-minor-pre-major": true
     }
   }
