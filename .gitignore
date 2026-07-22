@@ -1,0 +1,20 @@
+# Java build output
+target/
+*.class
+*.jar
+*.war
+
+# IDE files
+.idea/
+*.iml
+.project
+.classpath
+.settings/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local environment and test containers
+.env
+testcontainers.properties
