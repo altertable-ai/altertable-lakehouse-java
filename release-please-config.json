@@ -1,0 +1,9 @@
+{
+  "packages": {
+    ".": {
+      "release-type": "java",
+      "package-name": "altertable-lakehouse-java",
+      "bump-minor-pre-major": true
+    }
+  }
+}
