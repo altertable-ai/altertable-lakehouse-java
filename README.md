@@ -100,7 +100,7 @@ mvn test
 mvn verify
 ```
 
-The test suite uses an in-process HTTP server for deterministic unit coverage. CI runs the same suite and is the release gate.
+The integration suite runs against `ghcr.io/altertable-ai/altertable-mock:latest`. Locally, Testcontainers starts the mock automatically; CI provides it as a service on port `15000`. No production credentials are required.
 
 ## License
 

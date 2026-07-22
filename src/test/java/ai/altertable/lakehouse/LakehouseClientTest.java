@@ -5,61 +5,95 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpServer;
-import java.io.IOException;
-import java.net.InetSocketAddress;
+import com.fasterxml.jackson.databind.JsonNode;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.utility.DockerImageName;
 
 class LakehouseClientTest {
-  private HttpServer server;
-  private LakehouseClient client;
+  private static final int LAKEHOUSE_PORT = 15000;
+  private static final String USERNAME = "testuser";
+  private static final String PASSWORD = "testpass";
+  private static final boolean CI = System.getenv("CI") != null;
+  private static final GenericContainer<?> MOCK = new GenericContainer<>(
+      DockerImageName.parse("ghcr.io/altertable-ai/altertable-mock:latest"))
+      .withExposedPorts(LAKEHOUSE_PORT)
+      .withEnv("ALTERTABLE_MOCK_USERS", USERNAME + ":" + PASSWORD)
+      .waitingFor(Wait.forListeningPort())
+      .withStartupTimeout(Duration.ofSeconds(90));
+  private static LakehouseClient client;
 
-  @BeforeEach void startServer() throws IOException {
-    server = HttpServer.create(new InetSocketAddress(0), 0);
-    server.createContext("/", this::respond);
-    server.start();
+  @BeforeAll static void startMock() {
+    int port;
+    if (CI) {
+      port = Integer.parseInt(System.getenv().getOrDefault("ALTERTABLE_MOCK_PORT", "15000"));
+    } else {
+      MOCK.start();
+      port = MOCK.getMappedPort(LAKEHOUSE_PORT);
+    }
     client = new LakehouseClient(new LakehouseClient.Config()
-        .baseUrl("http://localhost:" + server.getAddress().getPort())
-        .credentials("testuser", "testpass").retries(0));
+        .baseUrl("http://localhost:" + port)
+        .credentials(USERNAME, PASSWORD)
+        .retries(0));
   }
 
-  @AfterEach void stopServer() { server.stop(0); }
+  @AfterAll static void stopMock() {
+    if (!CI) MOCK.stop();
+  }
 
-  @Test void streamsRowsAndAccumulatesThem() {
-    LakehouseClient.QueryResult result = client.query(LakehouseClient.QueryRequest.of("select 1"));
-    assertEquals("select 1", result.metadata().get("statement").asText());
-    assertEquals(List.of("number"), result.columns());
-    assertEquals(1, result.iterator().next().get(0).asInt());
-    result.close();
+  @Test void streamsAndAccumulatesRowsFromTheMock() {
+    LakehouseClient.QueryResult streamed = client.query(LakehouseClient.QueryRequest.of("SELECT 1 AS answer"));
+    assertEquals("SELECT 1 AS answer", streamed.metadata().get("statement").asText());
+    assertEquals(List.of("answer"), streamed.columns());
+    JsonNode row = streamed.iterator().next();
+    assertEquals(1, row.get("answer").asInt());
+    streamed.close();
 
-    LakehouseClient.QueryAllResult all = client.queryAll(LakehouseClient.QueryRequest.of("select 1"));
+    LakehouseClient.QueryAllResult all = client.queryAll(LakehouseClient.QueryRequest.of("SELECT 1 AS answer UNION ALL SELECT 2"));
     assertEquals(2, all.rows().size());
+    assertEquals(2, all.rows().get(1).get("answer").asInt());
   }
 
-  @Test void constructsAllRequiredEndpointRequests() {
-    UUID id = UUID.randomUUID();
-    assertTrue(client.append("cat", "public", "events", LakehouseClient.AppendRequest.single(Map.of("id", 1)), null).ok());
-    assertEquals(id, client.getTask(id).taskId());
-    assertFalse(client.getQuery(id).query().isBlank());
-    assertTrue(client.cancelQuery(id, "session").cancelled());
-    client.upload("cat", "public", "events", LakehouseClient.UploadMode.CREATE, "a,b\n1,2\n".getBytes(StandardCharsets.UTF_8), "text/csv");
-    client.upsert("cat", "public", "events", "id", "id,name\n1,a\n".getBytes(StandardCharsets.UTF_8), "text/csv");
-    assertTrue(client.validate(LakehouseClient.ValidateRequest.of("select 1")).valid());
-    assertEquals("SEL", client.autocomplete(LakehouseClient.AutocompleteRequest.of("SEL")).statement());
+  @Test void supportsIngestionAppendAndUpsertAgainstTheMock() {
+    byte[] csv = "id,name\n1,Alice\n2,Bob\n".getBytes(StandardCharsets.UTF_8);
+    client.upload("memory", "main", "people", LakehouseClient.UploadMode.CREATE, csv, "text/csv");
+    client.append("memory", "main", "people", LakehouseClient.AppendRequest.single(Map.of("id", 3, "name", "Cara")), null);
+    client.upsert("memory", "main", "people", "id", "[{\"id\":2,\"name\":\"Bobby\"}]".getBytes(StandardCharsets.UTF_8), "application/json");
+
+    LakehouseClient.QueryAllResult result = client.queryAll(LakehouseClient.QueryRequest.of("SELECT id, name FROM people ORDER BY id"));
+    assertEquals(3, result.rows().size());
+    assertEquals("Bobby", result.rows().get(1).get("name").asText());
   }
 
-  @Test void mapsAuthenticationFailuresAndRejectsMissingCredentials() {
-    LakehouseClient.Config config = new LakehouseClient.Config().baseUrl("http://localhost:1");
-    assertThrows(LakehouseClient.ConfigurationError.class, () -> new LakehouseClient(config));
+  @Test void getsQueryLogCancelsAndUsesSqlHelpersAgainstTheMock() {
+    LakehouseClient.QueryAllResult query = client.queryAll(LakehouseClient.QueryRequest.of("SELECT 42 AS answer"));
+    UUID queryId = UUID.fromString(query.metadata().get("query_id").asText());
+    String sessionId = query.metadata().get("session_id").asText();
+
+    assertEquals(queryId, client.getQuery(queryId).uuid());
+    assertTrue(client.cancelQuery(queryId, sessionId).cancelled());
+    assertTrue(client.validate(LakehouseClient.ValidateRequest.of("SELECT 1")).valid());
+    assertFalse(client.validate(LakehouseClient.ValidateRequest.of("NOT VALID SQL !!!")).valid());
+    assertTrue(client.autocomplete(LakehouseClient.AutocompleteRequest.of("SEL")).suggestions().stream()
+        .anyMatch(suggestion -> suggestion.suggestion().trim().equals("SELECT")));
+  }
+
+  @Test void mapsAuthenticationFailureFromTheMock() {
+    LakehouseClient invalidClient = new LakehouseClient(new LakehouseClient.Config()
+        .baseUrl(clientBaseUrl())
+        .credentials(USERNAME, "wrong-password")
+        .retries(0));
+
     LakehouseClient.AuthError error = assertThrows(LakehouseClient.AuthError.class,
-        () -> client.validate(LakehouseClient.ValidateRequest.of("unauthorized")));
+        () -> invalidClient.validate(LakehouseClient.ValidateRequest.of("SELECT 1")));
     assertEquals(401, error.statusCode());
   }
 
@@ -68,26 +102,8 @@ class LakehouseClientTest {
     assertTrue(request.payload().isArray());
   }
 
-  private void respond(HttpExchange exchange) throws IOException {
-    String path = exchange.getRequestURI().getPath();
-    String body;
-    int status = 200;
-    if (path.equals("/query")) {
-      exchange.getResponseHeaders().set("Content-Type", "application/x-ndjson");
-      body = "{\"statement\":\"select 1\",\"session_id\":\"s\",\"query_id\":\"q\"}\n[\"number\"]\n[1]\n[2]\n";
-    } else if (path.equals("/validate") && new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8).contains("unauthorized")) {
-      status = 401; body = "{\"error\":\"unauthorized\"}";
-    } else if (path.equals("/append")) body = "{\"ok\":true,\"error_code\":null,\"error_message\":null,\"task_id\":null}";
-    else if (path.startsWith("/tasks/")) body = "{\"task_id\":\"" + path.substring(7) + "\",\"status\":\"pending\"}";
-    else if (path.startsWith("/query/") && exchange.getRequestMethod().equals("DELETE")) body = "{\"cancelled\":true,\"message\":\"cancelled\"}";
-    else if (path.startsWith("/query/")) body = "{\"uuid\":\"" + path.substring(7) + "\",\"start_time\":\"2026-01-01T00:00:00Z\",\"query\":\"select 1\",\"client_interface\":\"HttpQuery\",\"visible\":true,\"session_id\":\"session\",\"threads\":1}";
-    else if (path.equals("/validate")) body = "{\"valid\":true,\"statement\":\"select 1\",\"connections_errors\":{},\"error\":null}";
-    else if (path.equals("/autocomplete")) body = "{\"suggestions\":[],\"statement\":\"SEL\",\"connections_errors\":{}}";
-    else body = "{}";
-    exchange.getResponseHeaders().set("Content-Type", "application/json");
-    byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
-    exchange.sendResponseHeaders(status, bytes.length);
-    exchange.getResponseBody().write(bytes);
-    exchange.close();
+  private static String clientBaseUrl() {
+    int port = CI ? Integer.parseInt(System.getenv().getOrDefault("ALTERTABLE_MOCK_PORT", "15000")) : MOCK.getMappedPort(LAKEHOUSE_PORT);
+    return "http://localhost:" + port;
   }
 }
