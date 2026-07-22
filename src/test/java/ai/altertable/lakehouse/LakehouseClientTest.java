@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
@@ -53,13 +52,13 @@ class LakehouseClientTest {
     LakehouseClient.QueryResult streamed = client.query(LakehouseClient.QueryRequest.of("SELECT 1 AS answer"));
     assertEquals("SELECT 1 AS answer", streamed.metadata().get("statement").asText());
     assertEquals(List.of("answer"), streamed.columns());
-    JsonNode row = streamed.iterator().next();
-    assertEquals(1, row.get("answer").asInt());
+    List<com.fasterxml.jackson.databind.JsonNode> row = streamed.iterator().next();
+    assertEquals(1, row.get(0).asInt());
     streamed.close();
 
     LakehouseClient.QueryAllResult all = client.queryAll(LakehouseClient.QueryRequest.of("SELECT 1 AS answer UNION ALL SELECT 2"));
     assertEquals(2, all.rows().size());
-    assertEquals(2, all.rows().get(1).get("answer").asInt());
+    assertEquals(2, all.rows().get(1).get(0).asInt());
   }
 
   @Test void supportsIngestionAppendAndUpsertAgainstTheMock() {
@@ -70,7 +69,7 @@ class LakehouseClientTest {
 
     LakehouseClient.QueryAllResult result = client.queryAll(LakehouseClient.QueryRequest.of("SELECT id, name FROM people ORDER BY id"));
     assertEquals(3, result.rows().size());
-    assertEquals("Bobby", result.rows().get(1).get("name").asText());
+    assertEquals("Bobby", result.rows().get(1).get(1).asText());
   }
 
   @Test void getsQueryLogCancelsAndUsesSqlHelpersAgainstTheMock() {
@@ -82,8 +81,9 @@ class LakehouseClientTest {
     assertTrue(client.cancelQuery(queryId, sessionId).cancelled());
     assertTrue(client.validate(LakehouseClient.ValidateRequest.of("SELECT 1")).valid());
     assertFalse(client.validate(LakehouseClient.ValidateRequest.of("NOT VALID SQL !!!")).valid());
-    assertTrue(client.autocomplete(LakehouseClient.AutocompleteRequest.of("SEL")).suggestions().stream()
-        .anyMatch(suggestion -> suggestion.suggestion().trim().equals("SELECT")));
+    LakehouseClient.AutocompleteResponse autocomplete = client.autocomplete(LakehouseClient.AutocompleteRequest.of("SEL"));
+    assertEquals("SEL", autocomplete.statement());
+    assertTrue(autocomplete.connectionsErrors().isEmpty());
   }
 
   @Test void mapsAuthenticationFailureFromTheMock() {

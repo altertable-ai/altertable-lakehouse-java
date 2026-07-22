@@ -81,7 +81,7 @@ public final class LakehouseClient {
 
   public QueryAllResult queryAll(QueryRequest request) {
     try (QueryResult result = query(request)) {
-      List<JsonNode> rows = new ArrayList<>();
+      List<List<JsonNode>> rows = new ArrayList<>();
       result.forEach(rows::add);
       return new QueryAllResult(result.metadata(), result.columns(), List.copyOf(rows));
     }
@@ -254,10 +254,10 @@ public final class LakehouseClient {
   public record QueryStats(CachingStats caching, MemoryStats memory, ScanStats scan) { }
   public record QueryProgress(double percentage, @JsonProperty("rows_processed") long rowsProcessed, @JsonProperty("total_rows") long totalRows) { }
   public record QueryLogResponse(UUID uuid, @JsonProperty("start_time") String startTime, @JsonProperty("end_time") String endTime, @JsonProperty("duration_ms") Long durationMs, String query, @JsonProperty("session_id") String sessionId, @JsonProperty("client_interface") SessionKind clientInterface, String error, QueryStats stats, QueryProgress progress, Boolean visible, @JsonProperty("requested_by") String requestedBy, @JsonProperty("user_agent") String userAgent) { }
-  public record QueryAllResult(JsonNode metadata, List<String> columns, List<JsonNode> rows) { }
+  public record QueryAllResult(JsonNode metadata, List<String> columns, List<List<JsonNode>> rows) { }
 
   /** A single-use, lazy iterator over an NDJSON response. */
-  public static final class QueryResult implements Iterable<JsonNode>, AutoCloseable {
+  public static final class QueryResult implements Iterable<List<JsonNode>>, AutoCloseable {
     private final BufferedReader reader; private final ObjectMapper json; private final JsonNode metadata; private final List<String> columns; private boolean iterated;
     private QueryResult(InputStream body, ObjectMapper json) throws IOException {
       this.reader = new BufferedReader(new InputStreamReader(body, StandardCharsets.UTF_8)); this.json = json;
@@ -266,11 +266,11 @@ public final class LakehouseClient {
       List<String> names = new ArrayList<>(); for (JsonNode column : schema) names.add(column.asText()); this.columns = List.copyOf(names);
     }
     public JsonNode metadata() { return metadata; } public List<String> columns() { return columns; }
-    @Override public Iterator<JsonNode> iterator() {
+    @Override public Iterator<List<JsonNode>> iterator() {
       if (iterated) throw new IllegalStateException("QueryResult rows can only be iterated once"); iterated = true;
       return new Iterator<>() { private String next = nextLine(); private int lineIndex = 3;
         @Override public boolean hasNext() { return next != null; }
-        @Override public JsonNode next() { if (next == null) throw new NoSuchElementException(); String line = next; next = nextLine(); return parse(line, lineIndex++); }
+        @Override public List<JsonNode> next() { if (next == null) throw new NoSuchElementException(); String line = next; next = nextLine(); JsonNode row = parse(line, lineIndex++); if (!row.isArray()) throw new ParseError("query", "POST", "/query", null, false, null, new IOException("NDJSON row is not an array")); List<JsonNode> values = new ArrayList<>(); row.forEach(values::add); return List.copyOf(values); }
       };
     }
     private String nextLine() { try { return reader.readLine(); } catch (IOException error) { throw new ParseError("query", "POST", "/query", null, true, null, error); } }
