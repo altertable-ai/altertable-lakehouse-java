@@ -4,7 +4,7 @@
 [![Maven Central](https://img.shields.io/maven-central/v/ai.altertable/altertable-lakehouse-java.svg)](https://central.sonatype.com/artifact/ai.altertable/altertable-lakehouse-java)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A typed Java 17 client for querying and ingesting data through the Altertable Lakehouse API.
+A typed Java client for querying and ingesting data through the Altertable Lakehouse API. It supports Java 17, 21, and 25; published artifacts target the Java 17 bytecode baseline.
 
 ## Install
 
@@ -97,7 +97,7 @@ When direct credentials are not configured, the client reads `ALTERTABLE_LAKEHOU
 
 ## Development
 
-Use Java 17 and Maven.
+Use Java 17, 21, or 25 with Maven. The published SDK targets the Java 17 bytecode baseline.
 
 ```bash
 mvn dependency:resolve
