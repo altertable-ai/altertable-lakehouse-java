@@ -9,5 +9,5 @@
 ## Checklist
 
 - [ ] Tests added or updated
-- [ ] \`CHANGELOG.md\` updated (skip for docs/CI-only changes)
-- [ ] Breaking change noted in commit footer (\`BREAKING CHANGE: …\`) and changelog
+- [ ] `CHANGELOG.md` updated (skip for docs/CI-only changes)
+- [ ] Breaking change noted in commit footer (`BREAKING CHANGE: …`) and changelog
