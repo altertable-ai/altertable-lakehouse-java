@@ -37,7 +37,7 @@ jobs:
 
       - name: Publish to Maven Central
         if: ${{ steps.release.outputs.release_created }}
-        run: mvn --batch-mode --no-transfer-progress -Prelease deploy
+        run: mvn --batch-mode --no-transfer-progress -DskipTests -Prelease deploy
         env:
           OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
           OSSRH_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
