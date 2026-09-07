@@ -41,3 +41,7 @@ All notable changes to this project are documented in this file.
 ### Added
 
 - Add the initial typed Java client for the Altertable Lakehouse API.
+
+### Fixed
+
+- Preserve typed query schemas and surface backend query stream errors.

@@ -75,15 +75,16 @@ public final class LakehouseClient {
       try (InputStream body = response.body()) { throw failure("query", "POST", "/query", response, body.readAllBytes(), null); }
       catch (IOException error) { throw new NetworkError("query", "POST", "/query", null, true, null, error); }
     }
-    try { return new QueryResult(response.body(), json); }
-    catch (IOException error) { try { response.body().close(); } catch (IOException ignored) { } throw new ParseError("query", "POST", "/query", null, false, null, error); }
+    try { return new QueryResult(response.body(), json, response.statusCode(), requestId(response)); }
+    catch (LakehouseException error) { try { response.body().close(); } catch (IOException ignored) { } throw error; }
+    catch (IOException error) { try { response.body().close(); } catch (IOException ignored) { } throw new ParseError("query", "POST", "/query", response.statusCode(), false, requestId(response), error); }
   }
 
   public QueryAllResult queryAll(QueryRequest request) {
     try (QueryResult result = query(request)) {
       List<List<JsonNode>> rows = new ArrayList<>();
       result.forEach(rows::add);
-      return new QueryAllResult(result.metadata(), result.columns(), List.copyOf(rows));
+      return new QueryAllResult(result.metadata(), result.columns(), List.copyOf(rows), result.schema());
     }
   }
 
@@ -254,27 +255,45 @@ public final class LakehouseClient {
   public record QueryStats(CachingStats caching, MemoryStats memory, ScanStats scan) { }
   public record QueryProgress(double percentage, @JsonProperty("rows_processed") long rowsProcessed, @JsonProperty("total_rows") long totalRows) { }
   public record QueryLogResponse(UUID uuid, @JsonProperty("start_time") String startTime, @JsonProperty("end_time") String endTime, @JsonProperty("duration_ms") Long durationMs, String query, @JsonProperty("session_id") String sessionId, @JsonProperty("client_interface") SessionKind clientInterface, String error, QueryStats stats, QueryProgress progress, Boolean visible, @JsonProperty("requested_by") String requestedBy, @JsonProperty("user_agent") String userAgent) { }
-  public record QueryAllResult(JsonNode metadata, List<String> columns, List<List<JsonNode>> rows) { }
+  public record QueryColumn(String name, String type) { }
+  public record QueryAllResult(JsonNode metadata, List<String> columns, List<List<JsonNode>> rows, List<QueryColumn> schema) {
+    public QueryAllResult(JsonNode metadata, List<String> columns, List<List<JsonNode>> rows) { this(metadata, columns, rows, columns == null ? null : columns.stream().map(name -> new QueryColumn(name, null)).toList()); }
+  }
 
   /** A single-use, lazy iterator over an NDJSON response. */
   public static final class QueryResult implements Iterable<List<JsonNode>>, AutoCloseable {
-    private final BufferedReader reader; private final ObjectMapper json; private final JsonNode metadata; private final List<String> columns; private boolean iterated;
-    private QueryResult(InputStream body, ObjectMapper json) throws IOException {
-      this.reader = new BufferedReader(new InputStreamReader(body, StandardCharsets.UTF_8)); this.json = json;
+    private final BufferedReader reader; private final ObjectMapper json; private final JsonNode metadata; private final List<String> columns; private final List<QueryColumn> schema; private final int statusCode; private final String requestId; private boolean iterated;
+    private QueryResult(InputStream body, ObjectMapper json, int statusCode, String requestId) throws IOException {
+      this.reader = new BufferedReader(new InputStreamReader(body, StandardCharsets.UTF_8)); this.json = json; this.statusCode = statusCode; this.requestId = requestId;
       this.metadata = parse(reader.readLine(), 1); JsonNode schema = parse(reader.readLine(), 2);
-      if (!schema.isArray()) throw new ParseError("query", "POST", "/query", null, false, null, new IOException("NDJSON schema line is not an array"));
-      List<String> names = new ArrayList<>(); for (JsonNode column : schema) names.add(column.asText()); this.columns = List.copyOf(names);
+      throwIfQueryError(schema, 2);
+      if (!schema.isArray()) throw new ParseError("query", "POST", "/query", statusCode, false, requestId, new IOException("NDJSON schema line is not an array"));
+      List<QueryColumn> fields = new ArrayList<>(); for (int index = 0; index < schema.size(); index++) fields.add(parseColumn(schema.get(index), index)); this.schema = List.copyOf(fields);
+      this.columns = fields.stream().map(QueryColumn::name).toList();
     }
     public JsonNode metadata() { return metadata; } public List<String> columns() { return columns; }
+    public List<QueryColumn> schema() { return schema; }
     @Override public Iterator<List<JsonNode>> iterator() {
       if (iterated) throw new IllegalStateException("QueryResult rows can only be iterated once"); iterated = true;
       return new Iterator<>() { private String next = nextLine(); private int lineIndex = 3;
         @Override public boolean hasNext() { return next != null; }
-        @Override public List<JsonNode> next() { if (next == null) throw new NoSuchElementException(); String line = next; next = nextLine(); JsonNode row = parse(line, lineIndex++); if (!row.isArray()) throw new ParseError("query", "POST", "/query", null, false, null, new IOException("NDJSON row is not an array")); List<JsonNode> values = new ArrayList<>(); row.forEach(values::add); return List.copyOf(values); }
+        @Override public List<JsonNode> next() { if (next == null) throw new NoSuchElementException(); String line = next; next = null; int currentLineIndex = lineIndex++; JsonNode row = parse(line, currentLineIndex); throwIfQueryError(row, currentLineIndex); if (!row.isArray()) throw new ParseError("query", "POST", "/query", statusCode, false, requestId, new IOException("NDJSON row is not an array")); List<JsonNode> values = new ArrayList<>(); row.forEach(values::add); next = nextLine(); return List.copyOf(values); }
       };
     }
-    private String nextLine() { try { return reader.readLine(); } catch (IOException error) { throw new ParseError("query", "POST", "/query", null, true, null, error); } }
-    private JsonNode parse(String line, int index) { if (line == null) throw new ParseError("query", "POST", "/query", null, false, null, new IOException("Unexpected end of NDJSON at line " + index)); try { return json.readTree(line); } catch (IOException error) { throw new ParseError("query", "POST", "/query", null, false, null, new IOException("Malformed NDJSON at line " + index + ": " + line, error)); } }
+    private static QueryColumn parseColumn(JsonNode column, int index) throws IOException {
+      if (column.isTextual()) return new QueryColumn(column.textValue(), null);
+      if (column.isObject()) {
+        JsonNode name = column.path("name"); JsonNode type = column.path("type");
+        if (name.isTextual() && type.isTextual()) return new QueryColumn(name.textValue(), type.textValue());
+      }
+      throw new IOException("NDJSON schema line 2 column " + (index + 1) + " must be a string or an object with string name and type");
+    }
+    private void throwIfQueryError(JsonNode value, int lineIndex) {
+      JsonNode error = value.isObject() ? value.get("error") : null;
+      if (error != null && error.isTextual()) throw new QueryError("query", "POST", "/query", statusCode, false, requestId, "NDJSON line " + lineIndex + ": " + error.textValue(), null);
+    }
+    private String nextLine() { try { return reader.readLine(); } catch (IOException error) { throw new ParseError("query", "POST", "/query", statusCode, true, requestId, error); } }
+    private JsonNode parse(String line, int index) { if (line == null) throw new ParseError("query", "POST", "/query", statusCode, false, requestId, new IOException("Unexpected end of NDJSON at line " + index)); try { return json.readTree(line); } catch (IOException error) { throw new ParseError("query", "POST", "/query", statusCode, false, requestId, new IOException("Malformed NDJSON at line " + index + ": " + line, error)); } }
     @Override public void close() { try { reader.close(); } catch (IOException ignored) { } }
   }
 
@@ -289,6 +308,7 @@ public final class LakehouseClient {
   public static final class TimeoutError extends LakehouseException { TimeoutError(String o, String m, String p, Integer s, boolean r, String id, Throwable c) { super(o, m, p, s, r, id, null, c); } }
   public static final class SerializationError extends LakehouseException { SerializationError(String o, String m, String p, Integer s, boolean r, String id, Throwable c) { super(o, m, p, s, r, id, null, c); } }
   public static final class ParseError extends LakehouseException { ParseError(String o, String m, String p, Integer s, boolean r, String id, Throwable c) { super(o, m, p, s, r, id, null, c); } }
+  public static final class QueryError extends LakehouseException { QueryError(String o, String m, String p, Integer s, boolean r, String id, String message, Throwable c) { super(o, m, p, s, r, id, message, c); } }
   public static final class ApiError extends LakehouseException { ApiError(String o, String m, String p, Integer s, boolean r, String id, String message, Throwable c) { super(o, m, p, s, r, id, message, c); } }
   public static final class ConfigurationError extends LakehouseException { ConfigurationError(String o, String m, String p, Integer s, boolean r, String id, Throwable c) { super(o, m, p, s, r, id, "missing Lakehouse credentials", c); } }
 }

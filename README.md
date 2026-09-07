@@ -36,13 +36,16 @@ Create `LakehouseClient` with `LakehouseClient.Config`. The client uses Java's b
 
 ### Querying
 
-- `query(QueryRequest)` returns a lazy `QueryResult`. Read `metadata()`, `columns()`, and iterate rows; call `close()` if you stop early.
-- `queryAll(QueryRequest)` returns `QueryAllResult` with all rows collected.
+- `query(QueryRequest)` returns a lazy `QueryResult`. Read `metadata()`, `schema()`, `columns()`, and iterate rows; call `close()` if you stop early.
+- `queryAll(QueryRequest)` returns `QueryAllResult` with its typed schema and all rows collected.
 - `getQuery(UUID)` returns `QueryLogResponse`.
 - `cancelQuery(UUID, String)` cancels a query for the supplied session.
 
+Each `QueryColumn` carries a name and SQL type. Legacy name-only schema responses remain supported with a null type.
+
 ```java
 var stream = client.query(LakehouseClient.QueryRequest.of("SELECT * FROM events"));
+System.out.println(stream.schema());
 for (var row : stream) System.out.println(row);
 stream.close();
 
@@ -78,7 +81,7 @@ var suggestions = client.autocomplete(LakehouseClient.AutocompleteRequest.of("SE
 
 ### Errors
 
-All SDK failures extend `LakehouseException` and expose operation, method, path, status code, retryability, and request ID. The typed subclasses are `AuthError`, `BadRequestError`, `NetworkError`, `TimeoutError`, `SerializationError`, `ParseError`, `ApiError`, and `ConfigurationError`.
+All SDK failures extend `LakehouseException` and expose operation, method, path, status code, retryability, and request ID. The typed subclasses are `AuthError`, `BadRequestError`, `NetworkError`, `TimeoutError`, `SerializationError`, `ParseError`, `QueryError`, `ApiError`, and `ConfigurationError`.
 
 ## Configuration
 
