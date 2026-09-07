@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.1.4](https://github.com/altertable-ai/altertable-lakehouse-java/compare/altertable-lakehouse-java-v0.1.3...altertable-lakehouse-java-v0.1.4) (2026-09-07)
+
+
+### Bug Fixes
+
+* **query:** expose typed result schema ([#23](https://github.com/altertable-ai/altertable-lakehouse-java/issues/23)) ([38bedbe](https://github.com/altertable-ai/altertable-lakehouse-java/commit/38bedbe960e898be52819bad7d6e0378754dbc4f))
+
+
+### Documentation
+
+* sync contributing guide ([#20](https://github.com/altertable-ai/altertable-lakehouse-java/issues/20)) ([7b64b33](https://github.com/altertable-ai/altertable-lakehouse-java/commit/7b64b3316d41e8374aac9b4067627737c1d13de4))
+
 ## [0.1.3](https://github.com/altertable-ai/altertable-lakehouse-java/compare/altertable-lakehouse-java-v0.1.2...altertable-lakehouse-java-v0.1.3) (2026-07-22)
 
 
