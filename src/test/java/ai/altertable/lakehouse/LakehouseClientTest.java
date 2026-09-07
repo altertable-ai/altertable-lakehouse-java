@@ -52,13 +52,25 @@ class LakehouseClientTest {
     LakehouseClient.QueryResult streamed = client.query(LakehouseClient.QueryRequest.of("SELECT 1 AS answer"));
     assertEquals("SELECT 1 AS answer", streamed.metadata().get("statement").asText());
     assertEquals(List.of("answer"), streamed.columns());
+    assertEquals(List.of(new LakehouseClient.QueryColumn("answer", "INTEGER")), streamed.schema());
     List<com.fasterxml.jackson.databind.JsonNode> row = streamed.iterator().next();
     assertEquals(1, row.get(0).asInt());
     streamed.close();
 
     LakehouseClient.QueryAllResult all = client.queryAll(LakehouseClient.QueryRequest.of("SELECT 1 AS answer UNION ALL SELECT 2"));
+    assertEquals(List.of(new LakehouseClient.QueryColumn("answer", "INTEGER")), all.schema());
     assertEquals(2, all.rows().size());
     assertEquals(2, all.rows().get(1).get(0).asInt());
+  }
+
+  @Test void surfacesQueryErrorsBeforeColumnsFromTheMock() {
+    LakehouseClient.QueryError error = assertThrows(LakehouseClient.QueryError.class,
+        () -> client.query(LakehouseClient.QueryRequest.of("SELECT * FROM missing_schema_test_table")));
+
+    assertTrue(error.getMessage().contains("NDJSON line 2"));
+    assertTrue(error.getMessage().contains("missing_schema_test_table"));
+    assertEquals(200, error.statusCode());
+    assertFalse(error.retriable());
   }
 
   @Test void supportsIngestionAppendAndUpsertAgainstTheMock() {
