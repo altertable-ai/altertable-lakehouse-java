@@ -263,7 +263,7 @@ public final class LakehouseClient {
   /** A single-use, lazy iterator over an NDJSON response. */
   public static final class QueryResult implements Iterable<List<JsonNode>>, AutoCloseable {
     private final BufferedReader reader; private final ObjectMapper json; private final JsonNode metadata; private final List<String> columns; private final List<QueryColumn> schema; private final int statusCode; private final String requestId; private boolean iterated;
-    private QueryResult(InputStream body, ObjectMapper json, int statusCode, String requestId) throws IOException {
+    QueryResult(InputStream body, ObjectMapper json, int statusCode, String requestId) throws IOException {
       this.reader = new BufferedReader(new InputStreamReader(body, StandardCharsets.UTF_8)); this.json = json; this.statusCode = statusCode; this.requestId = requestId;
       this.metadata = parse(reader.readLine(), 1); JsonNode schema = parse(reader.readLine(), 2);
       throwIfQueryError(schema, 2);
