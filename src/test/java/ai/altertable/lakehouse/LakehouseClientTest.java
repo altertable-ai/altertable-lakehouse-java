@@ -52,7 +52,7 @@ class LakehouseClientTest {
     LakehouseClient.QueryResult streamed = client.query(LakehouseClient.QueryRequest.of("SELECT 1 AS answer"));
     assertEquals("SELECT 1 AS answer", streamed.metadata().get("statement").asText());
     assertEquals(List.of("answer"), streamed.columns());
-    assertEquals(List.of(new LakehouseClient.QueryColumn("answer", "INTEGER")), streamed.schema());
+    assertEquals(List.of(new LakehouseClient.QueryColumn("answer", null)), streamed.schema());
     List<com.fasterxml.jackson.databind.JsonNode> row = streamed.iterator().next();
     assertEquals(1, row.get(0).asInt());
     streamed.close();

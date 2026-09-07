@@ -25,6 +25,16 @@ class LakehouseClientQuerySchemaTest {
     }
   }
 
+  @Test void preservesTypedSchema() throws IOException {
+    try (LakehouseClient.QueryResult result = parse(
+        "[{\"name\":\"answer\",\"type\":\"INTEGER\"}]\n[1]\n")) {
+      assertEquals(
+          List.of(new LakehouseClient.QueryColumn("answer", "INTEGER")),
+          result.schema());
+      assertEquals(1, result.iterator().next().get(0).asInt());
+    }
+  }
+
   @Test void rejectsMalformedSchemaObjects() {
     IOException error = assertThrows(IOException.class,
         () -> parse("[{\"name\":\"answer\",\"type\":1}]\n[1]\n"));
