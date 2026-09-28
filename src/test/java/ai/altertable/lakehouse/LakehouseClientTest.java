@@ -107,6 +107,38 @@ class LakehouseClientTest {
     LakehouseClient.AuthError error = assertThrows(LakehouseClient.AuthError.class,
         () -> invalidClient.validate(LakehouseClient.ValidateRequest.of("SELECT 1")));
     assertEquals(401, error.statusCode());
+    assertEquals("validate failed: HTTP status 401", error.getMessage());
+  }
+
+  @Test void includesTheResponseBodyInHttpErrorsFromTheMock() {
+    LakehouseClient.BadRequestError error = assertThrows(LakehouseClient.BadRequestError.class,
+        () -> client.upload("memory", "main", "missing_error_body_table", LakehouseClient.UploadMode.APPEND,
+            "id\n1\n".getBytes(StandardCharsets.UTF_8), "text/csv"));
+
+    assertTrue(error.getMessage().startsWith("upload failed: HTTP status 400: "));
+    assertTrue(error.getMessage().contains("missing_error_body_table"));
+  }
+
+  @Test void truncatesOversizedErrorBodiesFromTheMock() {
+    LakehouseClient.BadRequestError error = assertThrows(LakehouseClient.BadRequestError.class,
+        () -> client.upload("memory", "main", "t".repeat(1_500), LakehouseClient.UploadMode.APPEND,
+            "id\n1\n".getBytes(StandardCharsets.UTF_8), "text/csv"));
+
+    assertEquals("upload failed: HTTP status 400: ".length() + 1_000 + "...".length(), error.getMessage().length());
+    assertTrue(error.getMessage().endsWith("..."));
+  }
+
+  @Test void keepsCharactersWholeWhenTruncatingErrorBodiesFromTheMock() {
+    String emoji = "\uD83D\uDE00";
+    // One of the two names puts an emoji across the cut, whatever the length of the mock's message prefix.
+    for (String table : List.of(emoji.repeat(750), "t" + emoji.repeat(750))) {
+      LakehouseClient.BadRequestError error = assertThrows(LakehouseClient.BadRequestError.class,
+          () -> client.upload("memory", "main", table, LakehouseClient.UploadMode.APPEND,
+              "id\n1\n".getBytes(StandardCharsets.UTF_8), "text/csv"));
+
+      String message = error.getMessage();
+      assertFalse(Character.isHighSurrogate(message.charAt(message.length() - "...".length() - 1)), table.length() + " chars");
+    }
   }
 
   @Test void preservesAppendOneOfShape() {

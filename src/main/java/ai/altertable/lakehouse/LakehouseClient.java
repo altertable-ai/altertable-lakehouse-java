@@ -33,6 +33,7 @@ import java.util.UUID;
 public final class LakehouseClient {
   private static final Duration DEFAULT_CONNECT_TIMEOUT = Duration.ofSeconds(5);
   private static final Duration DEFAULT_REQUEST_TIMEOUT = Duration.ofSeconds(60);
+  private static final int MAX_ERROR_BODY_LENGTH = 1_000;
   private final HttpClient http;
   private final ObjectMapper json;
   private final URI baseUrl;
@@ -190,6 +191,12 @@ public final class LakehouseClient {
   private LakehouseException failure(String operation, String method, String path, HttpResponse<?> response, byte[] body, Throwable cause) {
     int status = response.statusCode(); String requestId = requestId(response);
     String detail = "HTTP status " + status;
+    String text = new String(body, StandardCharsets.UTF_8).strip();
+    if (text.length() > MAX_ERROR_BODY_LENGTH) {
+      int end = Character.isHighSurrogate(text.charAt(MAX_ERROR_BODY_LENGTH - 1)) ? MAX_ERROR_BODY_LENGTH - 1 : MAX_ERROR_BODY_LENGTH;
+      text = text.substring(0, end) + "...";
+    }
+    if (!text.isEmpty()) detail += ": " + text;
     if (status == 401 || status == 403) return new AuthError(operation, method, path, status, false, requestId, detail, cause);
     if (status == 400 || status == 404 || status == 422) return new BadRequestError(operation, method, path, status, false, requestId, detail, cause);
     return new ApiError(operation, method, path, status, status >= 500, requestId, detail, cause);
