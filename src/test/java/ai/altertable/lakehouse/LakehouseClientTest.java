@@ -5,6 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.sun.net.httpserver.HttpServer;
+import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
@@ -117,6 +120,45 @@ class LakehouseClientTest {
 
     assertTrue(error.getMessage().startsWith("upload failed: HTTP status 400: "));
     assertTrue(error.getMessage().contains("missing_error_body_table"));
+  }
+
+  @Test void includesTheResponseBodyInStreamedQueryHttpErrorsFromTheMock() {
+    LakehouseClient.QueryRequest request = new LakehouseClient.QueryRequest(
+        "SELECT 1", null, null, null, null, null, -1L, null, null, null, null, null, null, null, null);
+    LakehouseClient.BadRequestError error = assertThrows(LakehouseClient.BadRequestError.class,
+        () -> client.query(request));
+
+    assertEquals(422, error.statusCode());
+    assertTrue(error.getMessage().startsWith("query failed: HTTP status 422: "));
+    assertTrue(error.getMessage().contains("limit: invalid value: integer `-1`"));
+  }
+
+  @Test void includesTheResponseBodyInQueryHttp400Errors() throws IOException {
+    HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+    server.createContext("/query", exchange -> {
+      try (exchange) {
+        exchange.getRequestBody().readAllBytes();
+        byte[] body = "Session expired. Open a new session.".getBytes(StandardCharsets.UTF_8);
+        exchange.getResponseHeaders().set("Content-Type", "text/plain; charset=utf-8");
+        exchange.sendResponseHeaders(400, body.length);
+        exchange.getResponseBody().write(body);
+      }
+    });
+    server.start();
+    try {
+      LakehouseClient queryClient = new LakehouseClient(new LakehouseClient.Config()
+          .baseUrl("http://127.0.0.1:" + server.getAddress().getPort())
+          .credentials(USERNAME, PASSWORD)
+          .retries(0));
+      LakehouseClient.BadRequestError error = assertThrows(LakehouseClient.BadRequestError.class,
+          () -> queryClient.query(LakehouseClient.QueryRequest.of("SELECT 1")));
+
+      assertEquals(400, error.statusCode());
+      assertEquals("query failed: HTTP status 400: Session expired. Open a new session.",
+          error.getMessage());
+    } finally {
+      server.stop(0);
+    }
   }
 
   @Test void truncatesOversizedErrorBodiesFromTheMock() {
