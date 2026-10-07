@@ -49,6 +49,11 @@ System.out.println(stream.schema());
 for (var row : stream) System.out.println(row);
 stream.close();
 
+// Bind values can be named ($min_age) or positional ($1).
+var request = new LakehouseClient.QueryRequest("SELECT $min_age", null, null, null, null,
+    null, null, null, null, null, null, null, null, null, null, java.util.Map.of("min_age", 25));
+var filtered = client.queryAll(request);
+
 var log = client.getQuery(queryId);
 var cancelled = client.cancelQuery(queryId, sessionId);
 ```

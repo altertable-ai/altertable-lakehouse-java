@@ -242,7 +242,28 @@ public final class LakehouseClient {
   }
   public record AppendResponse(@JsonProperty("ok") boolean ok, @JsonProperty("error_code") AppendErrorCode errorCode, @JsonProperty("error_message") String errorMessage, @JsonProperty("task_id") UUID taskId) { }
   public record TaskResponse(@JsonProperty("task_id") UUID taskId, @JsonProperty("status") TaskStatus status) { }
-  public record QueryRequest(String statement, String catalog, String schema, @JsonProperty("session_id") String sessionId, @JsonProperty("compute_size") ComputeSize computeSize, Boolean sanitize, Long limit, Long offset, String timezone, Boolean ephemeral, Boolean visible, @JsonProperty("requested_by") String requestedBy, @JsonProperty("query_id") String queryId, Boolean cache, String dialect) { public static QueryRequest of(String statement) { return new QueryRequest(statement, null, null, null, null, null, null, null, null, null, null, null, null, null, null); } }
+  public record QueryRequest(String statement, String catalog, String schema, @JsonProperty("session_id") String sessionId, @JsonProperty("compute_size") ComputeSize computeSize, Boolean sanitize, Long limit, Long offset, String timezone, Boolean ephemeral, Boolean visible, @JsonProperty("requested_by") String requestedBy, @JsonProperty("query_id") String queryId, Boolean cache, String dialect, @JsonProperty("params") Object params) {
+    public QueryRequest { validateParams(params); }
+    public QueryRequest(String statement, String catalog, String schema, String sessionId, ComputeSize computeSize, Boolean sanitize, Long limit, Long offset, String timezone, Boolean ephemeral, Boolean visible, String requestedBy, String queryId, Boolean cache, String dialect) {
+      this(statement, catalog, schema, sessionId, computeSize, sanitize, limit, offset, timezone, ephemeral, visible, requestedBy, queryId, cache, dialect, null);
+    }
+    public static QueryRequest of(String statement) { return new QueryRequest(statement, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null); }
+    private static void validateParams(Object params) {
+      if (params == null) return;
+      if (params instanceof Map<?, ?> named) {
+        for (Map.Entry<?, ?> entry : named.entrySet()) {
+          if (!(entry.getKey() instanceof String) || !isJsonScalar(entry.getValue())) throw new IllegalArgumentException("params must map string names to JSON scalar values");
+        }
+        return;
+      }
+      if (params instanceof List<?> positional) {
+        for (Object value : positional) if (!isJsonScalar(value)) throw new IllegalArgumentException("params must contain JSON scalar values");
+        return;
+      }
+      throw new IllegalArgumentException("params must be a named map or positional list");
+    }
+    private static boolean isJsonScalar(Object value) { return value == null || value instanceof String || value instanceof Number || value instanceof Boolean; }
+  }
   public record ValidateRequest(String statement, String catalog, String schema, @JsonProperty("session_id") String sessionId) { public static ValidateRequest of(String statement) { return new ValidateRequest(statement, null, null, null); } }
   public record ValidateResponse(boolean valid, String statement, @JsonProperty("connections_errors") Map<String, String> connectionsErrors, String error) { }
   public record AutocompleteRequest(String statement, String catalog, String schema, @JsonProperty("session_id") String sessionId, @JsonProperty("max_suggestions") Integer maxSuggestions) { public static AutocompleteRequest of(String statement) { return new AutocompleteRequest(statement, null, null, null, null); } }

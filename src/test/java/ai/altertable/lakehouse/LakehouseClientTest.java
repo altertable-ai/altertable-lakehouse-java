@@ -114,6 +114,23 @@ class LakehouseClientTest {
     assertTrue(request.payload().isArray());
   }
 
+  @Test void serializesNamedAndPositionalQueryBindValues() throws Exception {
+    var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+    var named = new LakehouseClient.QueryRequest("SELECT $min_age", null, null, null, null, null, null, null,
+        null, null, null, null, null, null, null, java.util.Map.of("min_age", 25));
+    var positional = new LakehouseClient.QueryRequest("SELECT $1", null, null, null, null, null, null, null,
+        null, null, null, null, null, null, null, java.util.List.of(25));
+
+    assertEquals(25, mapper.readTree(mapper.writeValueAsString(named)).get("params").get("min_age").asInt());
+    assertEquals(25, mapper.readTree(mapper.writeValueAsString(positional)).get("params").get(0).asInt());
+  }
+
+  @Test void rejectsNonScalarQueryBindValues() {
+    assertThrows(IllegalArgumentException.class, () -> new LakehouseClient.QueryRequest(
+        "SELECT $value", null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+        java.util.Map.of("value", java.util.Map.of("not", "scalar"))));
+  }
+
   private static String clientBaseUrl() {
     int port = CI ? Integer.parseInt(System.getenv().getOrDefault("ALTERTABLE_MOCK_PORT", "15000")) : MOCK.getMappedPort(LAKEHOUSE_PORT);
     return "http://localhost:" + port;
