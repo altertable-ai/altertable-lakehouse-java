@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## Unreleased
+
+### Added
+
+* Support named and positional query bind values through `QueryRequest.params()`.
+
 ## [0.1.4](https://github.com/altertable-ai/altertable-lakehouse-java/compare/altertable-lakehouse-java-v0.1.3...altertable-lakehouse-java-v0.1.4) (2026-09-07)
 
 
