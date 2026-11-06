@@ -296,9 +296,37 @@ public final class LakehouseClient {
     public List<QueryColumn> schema() { return schema; }
     @Override public Iterator<List<JsonNode>> iterator() {
       if (iterated) throw new IllegalStateException("QueryResult rows can only be iterated once"); iterated = true;
-      return new Iterator<>() { private String next = nextLine(); private int lineIndex = 3;
-        @Override public boolean hasNext() { return next != null; }
-        @Override public List<JsonNode> next() { if (next == null) throw new NoSuchElementException(); String line = next; next = null; int currentLineIndex = lineIndex++; JsonNode row = parse(line, currentLineIndex); throwIfQueryError(row, currentLineIndex); if (!row.isArray()) throw new ParseError("query", "POST", "/query", statusCode, false, requestId, new IOException("NDJSON row is not an array")); List<JsonNode> values = new ArrayList<>(); row.forEach(values::add); next = nextLine(); return List.copyOf(values); }
+      return new Iterator<>() {
+        private String next;
+        private int lineIndex = 3;
+        private boolean loaded;
+        private boolean finished;
+
+        @Override public boolean hasNext() {
+          if (!loaded && !finished) {
+            next = nextLine();
+            loaded = true;
+            finished = next == null;
+          }
+          return !finished;
+        }
+
+        @Override public List<JsonNode> next() {
+          if (!hasNext()) throw new NoSuchElementException();
+          String line = next;
+          next = null;
+          loaded = false;
+          // A parse/query failure terminates this iterator; only a valid row
+          // makes it eligible to read another line on the next call.
+          finished = true;
+          JsonNode row = parse(line, lineIndex++);
+          throwIfQueryError(row, lineIndex - 1);
+          if (!row.isArray()) throw new ParseError("query", "POST", "/query", statusCode, false, requestId, new IOException("NDJSON row is not an array"));
+          List<JsonNode> values = new ArrayList<>();
+          row.forEach(values::add);
+          finished = false;
+          return List.copyOf(values);
+        }
       };
     }
     private static QueryColumn parseColumn(JsonNode column, int index) throws IOException {

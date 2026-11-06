@@ -36,7 +36,7 @@ Create `LakehouseClient` with `LakehouseClient.Config`. The client uses Java's b
 
 ### Querying
 
-- `query(QueryRequest)` returns a lazy `QueryResult`. Read `metadata()`, `schema()`, `columns()`, and iterate rows; call `close()` if you stop early.
+- `query(QueryRequest)` returns a lazy `QueryResult`. Read `metadata()`, `schema()`, `columns()`, and iterate rows; each row is returned without waiting for the following row. Call `close()` if you stop early.
 - `queryAll(QueryRequest)` returns `QueryAllResult` with its typed schema and all rows collected.
 - `getQuery(UUID)` returns `QueryLogResponse`.
 - `cancelQuery(UUID, String)` cancels a query for the supplied session.

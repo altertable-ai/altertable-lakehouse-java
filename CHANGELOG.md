@@ -4,6 +4,10 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+### Fixed
+
+* Return each streamed query row without waiting for the following row or response end.
+
 ### Added
 
 * Support named and positional query bind values through `QueryRequest.params()`.
