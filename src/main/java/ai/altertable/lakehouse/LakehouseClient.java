@@ -1,6 +1,7 @@
 package ai.altertable.lakehouse;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonValue;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -242,7 +243,7 @@ public final class LakehouseClient {
   }
   public record AppendResponse(@JsonProperty("ok") boolean ok, @JsonProperty("error_code") AppendErrorCode errorCode, @JsonProperty("error_message") String errorMessage, @JsonProperty("task_id") UUID taskId) { }
   public record TaskResponse(@JsonProperty("task_id") UUID taskId, @JsonProperty("status") TaskStatus status) { }
-  public record QueryRequest(String statement, String catalog, String schema, @JsonProperty("session_id") String sessionId, @JsonProperty("compute_size") ComputeSize computeSize, Boolean sanitize, Long limit, Long offset, String timezone, Boolean ephemeral, Boolean visible, @JsonProperty("requested_by") String requestedBy, @JsonProperty("query_id") String queryId, Boolean cache, String dialect, @JsonProperty("params") Object params) {
+  public record QueryRequest(String statement, String catalog, String schema, @JsonProperty("session_id") String sessionId, @JsonProperty("compute_size") ComputeSize computeSize, Boolean sanitize, Long limit, Long offset, String timezone, Boolean ephemeral, Boolean visible, @JsonProperty("requested_by") String requestedBy, @JsonProperty("query_id") String queryId, Boolean cache, String dialect, @JsonInclude(JsonInclude.Include.NON_NULL) @JsonProperty("params") Object params) {
     public QueryRequest { validateParams(params); }
     public QueryRequest(String statement, String catalog, String schema, String sessionId, ComputeSize computeSize, Boolean sanitize, Long limit, Long offset, String timezone, Boolean ephemeral, Boolean visible, String requestedBy, String queryId, Boolean cache, String dialect) {
       this(statement, catalog, schema, sessionId, computeSize, sanitize, limit, offset, timezone, ephemeral, visible, requestedBy, queryId, cache, dialect, null);
