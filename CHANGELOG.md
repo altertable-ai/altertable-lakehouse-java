@@ -4,6 +4,10 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+### Fixed
+
+* Omit unspecified query bind parameters instead of sending `params: null`.
+
 ### Added
 
 * Support named and positional query bind values through `QueryRequest.params()`.
